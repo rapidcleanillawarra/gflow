@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { detectFlowMode } from './lib/flow-mode.ts';
+import { detectFlowLayout, detectFlowMode } from './lib/flow-mode.ts';
 import { getProfileUrl, hasFlowProfile, loadProfileConfig } from './lib/profile-config.ts';
 
 const profile = loadProfileConfig();
@@ -39,5 +39,15 @@ test.describe('Google Flow', () => {
 		expect(['image', 'video']).toContain(mode);
 
 		console.log(`Flow is in ${mode} mode`);
+	});
+
+	test('detects video frame input mode', async ({ page }) => {
+		await openFlow(page);
+
+		const layout = await detectFlowLayout(page);
+		test.skip(layout.mode === 'image', 'Project is in image mode, not video.');
+
+		const frameInput = layout.mode === 'video' ? layout.frameInput : false;
+		console.log(`Flow video mode — frame input: ${frameInput ? 'yes' : 'no'}`);
 	});
 });
