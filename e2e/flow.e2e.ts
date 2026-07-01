@@ -7,6 +7,8 @@ test.describe('Google Flow', () => {
 	test.skip(!hasFlowProfile(), 'Save the veo3 profile at /cookies first.');
 
 	test('opens Flow project with saved cookies', async ({ page }) => {
+		if (process.env.PW_PAUSE) await page.pause();
+
 		await page.goto(getProfileUrl(), {
 			waitUntil: 'domcontentloaded',
 			timeout: 60_000
@@ -21,5 +23,7 @@ test.describe('Google Flow', () => {
 		expect(title.length).toBeGreaterThan(0);
 
 		console.log(`Opened Flow as profile "${profile.name}": ${page.url()}`);
+
+		if (process.env.PW_PAUSE) await page.pause();
 	});
 });

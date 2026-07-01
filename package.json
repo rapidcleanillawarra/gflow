@@ -12,6 +12,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test:e2e": "playwright test",
 		"test:e2e:flow": "playwright test --project=flow",
+		"test:e2e:flow:pause": "node e2e/run-flow-pause.mjs",
+		"record:flow": "node e2e/record-flow.mjs",
 		"test:e2e:app": "playwright test --project=app",
 		"test:e2e:install": "playwright install",
 		"test": "npm run test:e2e"
