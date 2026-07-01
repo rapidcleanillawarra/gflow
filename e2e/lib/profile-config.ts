@@ -10,33 +10,38 @@ export type ProfileConfig = {
 
 const authDir = 'e2e/.auth';
 
-export function loadProfileConfig(profileName?: string): ProfileConfig {
-	const profile = sanitizeProfileName(profileName ?? process.env.PLAYWRIGHT_COOKIE_PROFILE ?? 'default');
-	const storageStatePath = path.join(authDir, `${profile}.json`);
+function readManifest(): CookieProfileManifest | null {
 	const manifestPath = path.join(authDir, 'manifest.json');
 
-	let url: string | undefined;
-	let name = profile;
+	if (!existsSync(manifestPath)) return null;
 
-	if (existsSync(manifestPath)) {
-		try {
-			const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as CookieProfileManifest;
-			const entry = manifest.profiles.find(
-				(item) => sanitizeProfileName(item.name) === profile
-			);
+	try {
+		return JSON.parse(readFileSync(manifestPath, 'utf-8')) as CookieProfileManifest;
+	} catch {
+		return null;
+	}
+}
 
-			if (entry) {
-				name = entry.name;
-				url = entry.url;
-			}
-		} catch {
-			// ignore invalid manifest
-		}
+function findManifestEntry(manifest: CookieProfileManifest, slug: string) {
+	return manifest.profiles.find((item) => sanitizeProfileName(item.name) === slug);
+}
+
+export function loadProfileConfig(profileName?: string): ProfileConfig {
+	const requested = sanitizeProfileName(profileName ?? process.env.PLAYWRIGHT_COOKIE_PROFILE ?? 'default');
+	const manifest = readManifest();
+	let slug = requested;
+	let entry = manifest ? findManifestEntry(manifest, slug) : undefined;
+
+	if (!entry && manifest?.profiles.length === 1) {
+		entry = manifest.profiles[0];
+		slug = sanitizeProfileName(entry.name);
 	}
 
+	const storageStatePath = path.join(authDir, `${slug}.json`);
+
 	return {
-		name,
-		url,
+		name: entry?.name ?? slug,
+		url: entry?.url,
 		storageStatePath: existsSync(storageStatePath) ? storageStatePath : undefined
 	};
 }
@@ -55,4 +60,9 @@ export function getProfileUrl(profileName?: string): string {
 
 export function getProfileOrigin(url: string): string {
 	return new URL(url).origin;
+}
+
+export function hasFlowProfile(): boolean {
+	const profile = loadProfileConfig();
+	return Boolean(profile.storageStatePath && profile.url);
 }
