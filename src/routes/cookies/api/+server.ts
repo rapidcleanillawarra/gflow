@@ -100,6 +100,44 @@ export const POST: RequestHandler = async ({ request }) => {
 	});
 };
 
+export const PATCH: RequestHandler = async ({ request }) => {
+	if (!dev) {
+		return json({ message: 'Updating profiles is only available in development.' }, { status: 403 });
+	}
+
+	const body = (await request.json()) as { name?: string; url?: string };
+	const profileName = body.name?.trim();
+	let profileUrl: string;
+
+	if (!profileName) {
+		return json({ message: 'A profile name is required.' }, { status: 400 });
+	}
+
+	if (!body.url?.trim()) {
+		return json({ message: 'A URL is required.' }, { status: 400 });
+	}
+
+	try {
+		profileUrl = normalizeProfileUrl(body.url);
+	} catch {
+		return json({ message: 'Enter a valid URL.' }, { status: 400 });
+	}
+
+	const slug = sanitizeProfileName(profileName);
+	const manifest = await readManifest();
+	const index = manifest.profiles.findIndex((entry) => sanitizeProfileName(entry.name) === slug);
+
+	if (index === -1) {
+		return json({ message: 'Profile not found.' }, { status: 404 });
+	}
+
+	const profile: CookieProfile = { ...manifest.profiles[index], url: profileUrl };
+	manifest.profiles[index] = profile;
+	await writeManifest(manifest);
+
+	return json({ profile });
+};
+
 export const DELETE: RequestHandler = async ({ url }) => {
 	if (!dev) {
 		return json({ message: 'Deleting cookies is only available in development.' }, { status: 403 });

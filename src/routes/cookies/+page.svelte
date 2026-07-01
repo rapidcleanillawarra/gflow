@@ -10,6 +10,9 @@
 	let profiles = $state<CookieProfile[]>([]);
 	let message = $state('');
 	let saving = $state(false);
+	let editingProfile = $state<string | null>(null);
+	let editingUrl = $state('');
+	let updatingUrl = $state(false);
 
 	function showMessage(text: string) {
 		message = text;
@@ -82,6 +85,50 @@
 			showMessage('Could not reach the dev server. Run npm run dev and try again.');
 		} finally {
 			saving = false;
+		}
+	}
+
+	function startEditUrl(profile: CookieProfile) {
+		editingProfile = profile.file;
+		editingUrl = profile.url ?? '';
+	}
+
+	function cancelEditUrl() {
+		editingProfile = null;
+		editingUrl = '';
+	}
+
+	async function handleUpdateUrl(name: string) {
+		const url = editingUrl.trim();
+
+		if (!url) {
+			showMessage('URL is required.');
+			return;
+		}
+
+		updatingUrl = true;
+
+		try {
+			const response = await fetch(resolve('/cookies/api'), {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name, url })
+			});
+
+			const data = (await response.json()) as { message?: string; profile?: CookieProfile };
+
+			if (!response.ok) {
+				showMessage(data.message ?? 'Failed to update URL.');
+				return;
+			}
+
+			cancelEditUrl();
+			await loadProfiles();
+			showMessage(`Updated URL for "${data.profile?.name ?? name}".`);
+		} catch {
+			showMessage('Could not reach the dev server.');
+		} finally {
+			updatingUrl = false;
 		}
 	}
 
@@ -165,20 +212,55 @@
 			<ul class="profiles">
 				{#each profiles as profile (profile.file)}
 					<li>
-						<div>
+						<div class="profile-info">
 							<strong>{profile.name}</strong>
-							<p class="meta">
-								{#if profile.url}
-									<a href={profile.url} target="_blank" rel="noreferrer">{profile.url}</a>
-									·
-								{/if}
-								{profile.count} cookies · {getStorageStatePath(profile.name)} · saved
-								{new Date(profile.savedAt).toLocaleString()}
-							</p>
+							{#if editingProfile === profile.file}
+								<form
+									class="url-form"
+									onsubmit={(event) => {
+										event.preventDefault();
+										handleUpdateUrl(profile.name);
+									}}
+								>
+									<input
+										bind:value={editingUrl}
+										type="url"
+										placeholder="https://labs.google/fx/tools/flow"
+										required
+									/>
+									<div class="url-form-actions">
+										<button type="submit" disabled={updatingUrl}>
+											{updatingUrl ? 'Saving…' : 'Save'}
+										</button>
+										<button type="button" class="secondary" onclick={cancelEditUrl} disabled={updatingUrl}>
+											Cancel
+										</button>
+									</div>
+								</form>
+							{:else}
+								<p class="meta">
+									{#if profile.url}
+										<a href={profile.url} target="_blank" rel="noreferrer">{profile.url}</a>
+										·
+									{:else}
+										<span class="no-url">No URL set</span>
+										·
+									{/if}
+									{profile.count} cookies · {getStorageStatePath(profile.name)} · saved
+									{new Date(profile.savedAt).toLocaleString()}
+								</p>
+							{/if}
 						</div>
-						<button type="button" class="danger" onclick={() => handleDelete(profile.name)}>
-							Delete
-						</button>
+						<div class="profile-actions">
+							{#if editingProfile !== profile.file}
+								<button type="button" class="secondary" onclick={() => startEditUrl(profile)}>
+									Edit URL
+								</button>
+							{/if}
+							<button type="button" class="danger" onclick={() => handleDelete(profile.name)}>
+								Delete
+							</button>
+						</div>
 					</li>
 				{/each}
 			</ul>
@@ -268,6 +350,11 @@
 		cursor: pointer;
 	}
 
+	button.secondary {
+		background: #e2e8f0;
+		color: #334155;
+	}
+
 	button.danger {
 		background: #dc2626;
 	}
@@ -283,10 +370,32 @@
 		list-style: none;
 	}
 
+	.profile-info {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.profile-actions {
+		display: flex;
+		flex-shrink: 0;
+		gap: 0.5rem;
+	}
+
+	.url-form {
+		display: grid;
+		gap: 0.5rem;
+		margin-top: 0.5rem;
+	}
+
+	.url-form-actions {
+		display: flex;
+		gap: 0.5rem;
+	}
+
 	.profiles li {
 		display: flex;
 		justify-content: space-between;
-		align-items: center;
+		align-items: flex-start;
 		gap: 1rem;
 		padding: 0.75rem 0;
 		border-top: 1px solid #e2e8f0;
@@ -295,6 +404,10 @@
 	.profiles li:first-child {
 		border-top: 0;
 		padding-top: 0;
+	}
+
+	.no-url {
+		font-style: italic;
 	}
 
 	.meta,
